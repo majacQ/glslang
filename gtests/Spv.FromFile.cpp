@@ -1,5 +1,6 @@
  //
 // Copyright (C) 2016 Google, Inc.
+// Copyright (C) 2019 ARM Limited.
 //
 // All rights reserved.
 //
@@ -63,6 +64,7 @@ std::string FileNameAsCustomTestSuffixIoMap(
 }
 
 using CompileVulkanToSpirvTest = GlslangTest<::testing::TestWithParam<std::string>>;
+using CompileVulkanToSpirvDeadCodeElimTest = GlslangTest<::testing::TestWithParam<std::string>>;
 using CompileVulkanToDebugSpirvTest = GlslangTest<::testing::TestWithParam<std::string>>;
 using CompileVulkan1_1ToSpirvTest = GlslangTest<::testing::TestWithParam<std::string>>;
 using CompileToSpirv14Test = GlslangTest<::testing::TestWithParam<std::string>>;
@@ -85,6 +87,13 @@ TEST_P(CompileVulkanToSpirvTest, FromFile)
                             Target::Spv);
 }
 
+TEST_P(CompileVulkanToSpirvDeadCodeElimTest, FromFile)
+{
+    loadFileCompileAndCheck(GlobalTestSettings.testRoot, GetParam(),
+                            Source::GLSL, Semantics::Vulkan, glslang::EShTargetVulkan_1_0, glslang::EShTargetSpv_1_0,
+                            Target::Spv);
+}
+
 // Compiling GLSL to SPIR-V with debug info under Vulkan semantics. Expected
 // to successfully generate SPIR-V.
 TEST_P(CompileVulkanToDebugSpirvTest, FromFile)
@@ -95,6 +104,7 @@ TEST_P(CompileVulkanToDebugSpirvTest, FromFile)
                             Target::Spv, true, "",
                             "/baseResults/", false, true);
 }
+
 
 TEST_P(CompileVulkan1_1ToSpirvTest, FromFile)
 {
@@ -220,6 +230,14 @@ INSTANTIATE_TEST_CASE_P(
         "spv.while-continue-break.vert",
         "spv.while-simple.vert",
         // vulkan-specific tests
+        "rayQuery.rgen",
+        "rayQuery-no-cse.rgen",
+        "rayQuery-initialize.rgen",
+        "rayQuery-allOps.rgen",
+        "rayQuery-allOps.Error.rgen",
+        "rayQuery-committed.Error.rgen",
+        "rayQuery-allOps.comp",
+        "rayQuery-allOps.frag",
         "spv.set.vert",
         "spv.double.comp",
         "spv.100ops.frag",
@@ -255,12 +273,14 @@ INSTANTIATE_TEST_CASE_P(
         "spv.8bitstorage_Error-uint.frag",
         "spv.8bitstorage-ubo.vert",
         "spv.8bitstorage-ssbo.vert",
+        "spv.8bit-16bit-construction.frag",
         "spv.accessChain.frag",
         "spv.aggOps.frag",
         "spv.always-discard.frag",
         "spv.always-discard2.frag",
         "spv.arbPostDepthCoverage.frag",
         "spv.arbPostDepthCoverage_Error.frag",
+        "spv.atomicCounter.comp",
         "spv.bitCast.frag",
         "spv.bool.vert",
         "spv.boolInBlock.frag",
@@ -284,6 +304,7 @@ INSTANTIATE_TEST_CASE_P(
         "spv.bufferhandle7.frag",
         "spv.bufferhandle8.frag",
         "spv.bufferhandle9.frag",
+        "spv.bufferhandleUvec2.frag",
         "spv.bufferhandle_Error.frag",
         "spv.builtInXFB.vert",
         "spv.conditionalDemote.frag",
@@ -298,6 +319,8 @@ INSTANTIATE_TEST_CASE_P(
         "spv.dataOut.frag",
         "spv.dataOutIndirect.frag",
         "spv.dataOutIndirect.vert",
+        "spv.debugPrintf.frag",
+        "spv.debugPrintf_Error.frag",
         "spv.demoteDisabled.frag",
         "spv.deepRvalue.frag",
         "spv.depthOut.frag",
@@ -344,12 +367,17 @@ INSTANTIATE_TEST_CASE_P(
         "spv.nonSquare.vert",
         "spv.nonuniform.frag",
         "spv.nonuniform2.frag",
+        "spv.nonuniform3.frag",
+        "spv.nonuniform4.frag",
+        "spv.nonuniform5.frag",
         "spv.noWorkgroup.comp",
         "spv.offsets.frag",
         "spv.Operations.frag",
         "spv.paramMemory.frag",
         "spv.precision.frag",
+        "spv.precisionArgs.frag",
         "spv.precisionNonESSamp.frag",
+        "spv.precisionTexture.frag",
         "spv.prepost.frag",
         "spv.privateVariableTypes.frag",
         "spv.qualifiers.vert",
@@ -400,9 +428,13 @@ INSTANTIATE_TEST_CASE_P(
         "spv.specConstant.comp",
         "spv.specConstantComposite.vert",
         "spv.specConstantOperations.vert",
+        "spv.specConstant.float16.comp",
+        "spv.specConstant.int16.comp",
+        "spv.specConstant.int8.comp",
         "spv.storageBuffer.vert",
         "spv.precise.tese",
         "spv.precise.tesc",
+        "spv.volatileAtomic.comp",
         "spv.vulkan100.subgroupArithmetic.comp",
         "spv.vulkan100.subgroupPartitioned.comp",
         "spv.xfb.vert",
@@ -411,6 +443,23 @@ INSTANTIATE_TEST_CASE_P(
         "spv.samplerlessTextureFunctions.frag",
         "spv.smBuiltins.vert",
         "spv.smBuiltins.frag",
+    })),
+    FileNameAsCustomTestSuffix
+);
+
+// Cases with deliberately unreachable code.
+// By default the compiler will aggressively eliminate
+// unreachable merges and continues.
+INSTANTIATE_TEST_CASE_P(
+    GlslWithDeadCode, CompileVulkanToSpirvDeadCodeElimTest,
+    ::testing::ValuesIn(std::vector<std::string>({
+        "spv.dead-after-continue.vert",
+        "spv.dead-after-discard.frag",
+        "spv.dead-after-return.vert",
+        "spv.dead-after-loop-break.vert",
+        "spv.dead-after-switch-break.vert",
+        "spv.dead-complex-continue-after-return.vert",
+        "spv.dead-complex-merge-after-return.vert",
     })),
     FileNameAsCustomTestSuffix
 );
@@ -459,6 +508,22 @@ INSTANTIATE_TEST_CASE_P(
         "spv.subgroupShuffleRelative.comp",
         "spv.subgroupQuad.comp",
         "spv.subgroupVote.comp",
+        "spv.subgroupExtendedTypesArithmetic.comp",
+        "spv.subgroupExtendedTypesArithmeticNeg.comp",
+        "spv.subgroupExtendedTypesBallot.comp",
+        "spv.subgroupExtendedTypesBallotNeg.comp",
+        "spv.subgroupExtendedTypesClustered.comp",
+        "spv.subgroupExtendedTypesClusteredNeg.comp",
+        "spv.subgroupExtendedTypesPartitioned.comp",
+        "spv.subgroupExtendedTypesPartitionedNeg.comp",
+        "spv.subgroupExtendedTypesShuffle.comp",
+        "spv.subgroupExtendedTypesShuffleNeg.comp",
+        "spv.subgroupExtendedTypesShuffleRelative.comp",
+        "spv.subgroupExtendedTypesShuffleRelativeNeg.comp",
+        "spv.subgroupExtendedTypesQuad.comp",
+        "spv.subgroupExtendedTypesQuadNeg.comp",
+        "spv.subgroupExtendedTypesVote.comp",
+        "spv.subgroupExtendedTypesVoteNeg.comp",
         "spv.vulkan110.storageBuffer.vert",
     })),
     FileNameAsCustomTestSuffix
@@ -471,6 +536,7 @@ INSTANTIATE_TEST_CASE_P(
         "spv.1.4.LoopControl.frag",
         "spv.1.4.NonWritable.frag",
         "spv.1.4.OpEntryPoint.frag",
+        "spv.1.4.OpEntryPoint.opaqueParams.vert",
         "spv.1.4.OpSelect.frag",
         "spv.1.4.OpCopyLogical.comp",
         "spv.1.4.OpCopyLogicalBool.comp",
@@ -479,6 +545,22 @@ INSTANTIATE_TEST_CASE_P(
         "spv.1.4.sparseTexture.frag",
         "spv.1.4.texture.frag",
         "spv.1.4.constructComposite.comp",
+        "spv.ext.AnyHitShader.rahit",
+        "spv.ext.AnyHitShader_Errors.rahit",
+        "spv.ext.ClosestHitShader.rchit",
+        "spv.ext.ClosestHitShader_Errors.rchit",
+        "spv.ext.IntersectShader.rint",
+        "spv.ext.IntersectShader_Errors.rint",
+        "spv.ext.MissShader.rmiss",
+        "spv.ext.MissShader_Errors.rmiss",
+        "spv.ext.RayPrimCull_Errors.rgen",
+        "spv.ext.RayCallable.rcall",
+        "spv.ext.RayCallable_Errors.rcall",
+        "spv.ext.RayConstants.rgen",
+        "spv.ext.RayGenShader.rgen",
+        "spv.ext.RayGenShader11.rgen",
+        "spv.ext.RayGenShaderArray.rgen",
+        "spv.ext.World3x4.rahit",
     })),
     FileNameAsCustomTestSuffix
 );
@@ -524,7 +606,11 @@ INSTANTIATE_TEST_CASE_P(
         "spv.glFragColor.frag",
         "spv.rankShift.comp",
         "spv.specConst.vert",
+        "spv.specTexture.frag",
         "spv.OVR_multiview.vert",
+        "spv.uniformInitializer.frag",
+        "spv.uniformInitializerSpecConstant.frag",
+        "spv.uniformInitializerStruct.frag",
         "spv.xfbOffsetOnBlockMembersAssignment.vert",
         "spv.xfbOffsetOnStructMembersAssignment.vert",
         "spv.xfbOverlapOffsetCheckWithBlockAndMember.vert",
