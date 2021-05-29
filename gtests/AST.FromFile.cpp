@@ -278,6 +278,10 @@ INSTANTIATE_TEST_SUITE_P(
         "glsl.es320.subgroupShuffleRelative.comp",
         "glsl.es320.subgroupQuad.comp",
         "glsl.es320.subgroupVote.comp",
+        "terminate.frag",
+        "terminate.vert",
+        "negativeWorkGroupSize.comp",
+        "textureoffset_sampler2darrayshadow.vert",
     })),
     FileNameAsCustomTestSuffix
 );

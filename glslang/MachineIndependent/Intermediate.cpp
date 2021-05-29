@@ -65,7 +65,7 @@ namespace glslang {
 // Returns the added node.
 //
 
-TIntermSymbol* TIntermediate::addSymbol(int id, const TString& name, const TType& type, const TConstUnionArray& constArray,
+TIntermSymbol* TIntermediate::addSymbol(long long id, const TString& name, const TType& type, const TConstUnionArray& constArray,
                                         TIntermTyped* constSubtree, const TSourceLoc& loc)
 {
     TIntermSymbol* node = new TIntermSymbol(id, name, type);
@@ -1174,6 +1174,8 @@ TIntermTyped* TIntermediate::addConversion(TOperator op, const TType& type, TInt
     case EOpConstructUint16:
         canPromoteConstant = numericFeatures.contains(TNumericFeatures::shader_explicit_arithmetic_types) ||
                              numericFeatures.contains(TNumericFeatures::shader_explicit_arithmetic_types_int16);
+        break;
+    default:
         break;
     }
 #endif
@@ -2296,6 +2298,10 @@ TOperator TIntermediate::mapTypeToConstructorOp(const TType& type) const
     case EbtReference:
         op = EOpConstructReference;
         break;
+
+    case EbtAccStruct:
+        op = EOpConstructAccStruct;
+        break;
 #endif
     default:
         break;
@@ -2864,7 +2870,7 @@ void TIntermediate::addToCallGraph(TInfoSink& /*infoSink*/, const TString& calle
             return;
     }
 
-    callGraph.push_front(TCall(caller, callee));
+    callGraph.emplace_front(caller, callee);
 }
 
 //
@@ -3770,11 +3776,16 @@ void TIntermBinary::updatePrecision()
 {
      if (getBasicType() == EbtInt || getBasicType() == EbtUint ||
          getBasicType() == EbtFloat || getBasicType() == EbtFloat16) {
-        getQualifier().precision = std::max(right->getQualifier().precision, left->getQualifier().precision);
-        if (getQualifier().precision != EpqNone) {
-            left->propagatePrecision(getQualifier().precision);
-            right->propagatePrecision(getQualifier().precision);
-        }
+       if (op == EOpRightShift || op == EOpLeftShift) {
+         // For shifts get precision from left side only and thus no need to propagate
+         getQualifier().precision = left->getQualifier().precision;
+       } else {
+         getQualifier().precision = std::max(right->getQualifier().precision, left->getQualifier().precision);
+         if (getQualifier().precision != EpqNone) {
+           left->propagatePrecision(getQualifier().precision);
+           right->propagatePrecision(getQualifier().precision);
+         }
+       }
     }
 }
 
