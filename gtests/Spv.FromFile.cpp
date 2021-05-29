@@ -377,6 +377,7 @@ INSTANTIATE_TEST_CASE_P(
         "spv.precision.frag",
         "spv.precisionArgs.frag",
         "spv.precisionNonESSamp.frag",
+        "spv.precisionTexture.frag",
         "spv.prepost.frag",
         "spv.privateVariableTypes.frag",
         "spv.qualifiers.vert",
@@ -559,6 +560,7 @@ INSTANTIATE_TEST_CASE_P(
         "spv.ext.RayGenShader.rgen",
         "spv.ext.RayGenShader11.rgen",
         "spv.ext.RayGenShaderArray.rgen",
+        "spv.ext.World3x4.rahit",
     })),
     FileNameAsCustomTestSuffix
 );

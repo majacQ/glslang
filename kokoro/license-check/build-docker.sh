@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Copyright (C) 2020 Google, Inc.
 #
 # All rights reserved.
@@ -31,5 +33,7 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-# Presubmit build configuration.
-build_file: "glslang/kokoro/linux-clang-cmake/build.sh"
+set -e # Fail on any error.
+set -x # Display commands being run.
+
+license-checker --dir="$ROOT_DIR"
