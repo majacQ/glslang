@@ -115,6 +115,7 @@ struct TSampler {   // misnomer now; includes images, textures without sampler, 
 #endif
 
     bool is1D()          const { return dim == Esd1D; }
+    bool is2D()          const { return dim == Esd2D; }
     bool isBuffer()      const { return dim == EsdBuffer; }
     bool isRect()        const { return dim == EsdRect; }
     bool isSubpass()     const { return dim == EsdSubpass; }
@@ -1738,6 +1739,7 @@ public:
 
     virtual bool isScalar() const { return ! isVector() && ! isMatrix() && ! isStruct() && ! isArray(); }
     virtual bool isScalarOrVec1() const { return isScalar() || vector1; }
+    virtual bool isScalarOrVector() const { return !isMatrix() && !isStruct() && !isArray(); }
     virtual bool isVector() const { return vectorSize > 1 || vector1; }
     virtual bool isMatrix() const { return matrixCols ? true : false; }
     virtual bool isArray()  const { return arraySizes != nullptr; }
@@ -2336,6 +2338,17 @@ public:
         name += ';' ;
     }
 
+    // These variables are inconsistently declared inside and outside of gl_PerVertex in glslang right now.
+    // They are declared inside of 'in gl_PerVertex', but sitting as standalone when they are 'out'puts.
+    bool isInconsistentGLPerVertexMember(const TString& name) const
+    {
+        if (name == "gl_SecondaryPositionNV" ||
+            name == "gl_PositionPerViewNV")
+            return true;
+        return false;
+    }
+
+
     // Do two structure types match?  They could be declared independently,
     // in different places, but still might satisfy the definition of matching.
     // From the spec:
@@ -2351,22 +2364,48 @@ public:
             (isStruct() && right.isStruct() && structure == right.structure))
             return true;
 
-        // Both being nullptr was caught above, now they both have to be structures of the same number of elements
-        if (!isStruct() || !right.isStruct() ||
-            structure->size() != right.structure->size())
-            return false;
-
         // Structure names have to match
         if (*typeName != *right.typeName)
             return false;
 
-        // Compare the names and types of all the members, which have to match
-        for (unsigned int i = 0; i < structure->size(); ++i) {
-            if ((*structure)[i].type->getFieldName() != (*right.structure)[i].type->getFieldName())
-                return false;
+        // There are inconsistencies with how gl_PerVertex is setup. For now ignore those as errors if they
+        // are known inconsistencies.
+        bool isGLPerVertex = *typeName == "gl_PerVertex";
 
-            if (*(*structure)[i].type != *(*right.structure)[i].type)
-                return false;
+        // Both being nullptr was caught above, now they both have to be structures of the same number of elements
+        if (!isStruct() || !right.isStruct() ||
+            (structure->size() != right.structure->size() && !isGLPerVertex))
+            return false;
+
+        // Compare the names and types of all the members, which have to match
+        for (size_t li = 0, ri = 0; li < structure->size() || ri < right.structure->size(); ++li, ++ri) {
+            if (li < structure->size() && ri < right.structure->size()) {
+                if ((*structure)[li].type->getFieldName() == (*right.structure)[ri].type->getFieldName()) {
+                    if (*(*structure)[li].type != *(*right.structure)[ri].type)
+                        return false;
+                } else {
+                    // If one of the members is something that's inconsistently declared, skip over it
+                    // for now.
+                    if (isGLPerVertex) {
+                        if (isInconsistentGLPerVertexMember((*structure)[li].type->getFieldName())) {
+                            ri--;
+                            continue;
+                        } else if (isInconsistentGLPerVertexMember((*right.structure)[ri].type->getFieldName())) {
+                            li--;
+                            continue;
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+            // If we get here, then there should only be inconsistently declared members left
+            } else if (li < structure->size()) {
+                if (!isInconsistentGLPerVertexMember((*structure)[li].type->getFieldName()))
+                    return false;
+            } else {
+                if (!isInconsistentGLPerVertexMember((*right.structure)[ri].type->getFieldName()))
+                    return false;
+            }
         }
 
         return true;
